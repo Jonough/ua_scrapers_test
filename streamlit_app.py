@@ -1,51 +1,140 @@
+# Python Standard Library Imports
+import time
 import streamlit as st
-import pandas as pd
 import numpy as np
+import requests
 
 # Third Party Imports
+import pandas as pd
 import airportsdata
 
 # Local Imports
 from ua_scrapers_ref import *
+from ot_scraper_engine import *
 
-st.title("🎈 My new app")
-st.write(
-    "Let's start building! For help and inspiration, head over to [docs.streamlit.io](https://docs.streamlit.io/).")
+# Global Variables
+AIRPORTS = airportsdata.load('IATA')  # vs ICAO
 
-df = pd.DataFrame({
-    'first column': range(0, 100, 2),
-    'second column': range(1, 100, 2)
-})
+# Make it look pretty (try to anyway..)
+st.logo(image='SSCLogoLowRes.png', size='large')
+st.title('UA Scrapers')
 
-# Random Scatter Plot around San Francisco:
-map_data = pd.DataFrame(
-    np.random.randn(1000, 2) / [50, 50] + [37.76, -122.4],
-    columns=['lat', 'lon'])
+def process_ot(skey, cats, bid_month):
+    st.write(bid_month)
+    l = len(cats)
+    i = 0
+    prog = st.progress(0)
 
-st.write(map_data)
-st.map(map_data)
+    initialize_session(skey)
 
-"""
-bid_month = st.selectbox('Bid Month:', BID_MONTHS)
-date = st.date_input('Pick a Day:', 'today')
-submit = st.button('Submit')
-"""
+    # Dataframe of OT
+    df = pd.DataFrame()
+    for cat in cats:
+        prog.progress(i/l, f'{cat[0]}{cat[1]}{cat[2]}')
+        i += 1
 
-with st.form("my_form"):
-    slider_val = st.slider("Inside the form")
-    st.form_submit_button('Submit')
-    st.write(slider_val)
+        ot = extract_ot_list(skey, cat, bid_month)
+        if ot.empty:
+            pass  # Generate warning - either no open time or bad html after 3 tries
+        else:
+            ot['Category'] = str(cat[0]) + str(cat[1]) + str(cat[2])
+            df = pd.concat((df, ot), ignore_index=True)
 
-# Import airportsdata in IATA format
-airports = airportsdata.load('IATA') # vs ICAO
+    prog.progress(100, "Done!")
+    # It didn't crash! Make sure the user sees this
+    time.sleep(2)
 
-# Generate a list of base, lat, long for each of our bases
-data = [(base, airports[base]['lat'], airports[base]['lon']) for base in BASES_W_FLEETS]
+    # If it's empty just return the empty dataframe, otherwise add the columns
+    if not df.empty:
+        ot_index = ['Pairing Number', 'Category', 'Pairing Date', 'Pay Time']
+        df = df[ot_index]
 
-# Turn that into a beautiful dataframe with column names
-ua_bases = pd.DataFrame(data, columns=['Base', 'lat', 'lon'])
+    return df
 
-# Plot it with minimal effort
-st.map(ua_bases)
 
-st.write(ua_bases)
+def visualizer(selected_bases):
+    # Follow a color scheme for each base (better color scheme pending)
+    colors = {
+        'EWR':   (255, 0, 0),
+        'DCA':   (255, 0, 0),
+        'MCO':   (255, 0, 0),
+        'CLE':   (255, 0, 0),
+        'ORD':   (255, 0, 0),
+        'IAH':   (255, 0, 0),
+        'DEN':   (255, 0, 0),
+        'LAS':   (255, 0, 0),
+        'LAX':   (255, 0, 0),
+        'SFO':   (255, 0, 0),
+        'GUM':   (255, 0, 0)
+    }
+
+    # Generate a list of base, lat, long for each of our bases
+    data = [(base, AIRPORTS[base]['lat'], AIRPORTS[base]['lon'], colors[base])
+            for base in selected_bases]
+
+    # Turn that into a beautiful dataframe with column names that works with streamlit map
+    ua_bases = pd.DataFrame(data, columns=['Base', 'lat', 'lon', 'color'])
+
+    # Plot it with minimal effort
+    st.map(ua_bases, color='color')
+
+
+# No form data submitted - all validation should happen in this 'branch'
+if 'ot_form' not in st.session_state:
+    # Form
+    with st.form(key='skey_getter', border=True,
+                 enter_to_submit=True, clear_on_submit=False):
+        ccs_url = st.text_area("Enter any CCS URL:")
+
+        # Bases multiselect with all option:
+        all = st.checkbox("Select all bases")
+        st.write("OR")
+        selected_bases = st.multiselect("Select one or more options:",
+                                        BASES_W_FLEETS)
+
+        # Bid month dropdown - default to NOV2024
+        bid_month = st.selectbox("Bid Month", BID_MONTHS, index=1)
+
+        # Submit button
+        if st.form_submit_button():
+            # If all selected, fill in selected bases
+            if (all):
+                selected_bases = list(BASES_W_FLEETS.keys())
+
+            # Check valid skey can be extracted from URL
+            if match := re.match(SKEY_RE, ccs_url):
+                # If no bases, prompt user to enter at least one
+                if not selected_bases:
+                    st.write("Please select at least one base!")
+                else:
+                    st.session_state.ot_form = (match.group(
+                        'skey'), selected_bases, bid_month)
+                    st.rerun()
+            else:
+                st.write("Not a valid CCS URL!")
+# We have form data submitted and validated, do the rest
+else:
+    # Unpack the ot_form results:
+    skey, selected_bases, bid_month = st.session_state.ot_form
+
+    # Turn selected bases into a list of selected categories by filtering all categories
+    selected_cats = list(filter(lambda c: c[0] in selected_bases, ALL_CATS))
+
+    # Convert to text to use in a dropdown of selected categories
+    selected_cats_text = [f'{c[0]}{c[1]}{c[2]}' for c in selected_cats]
+
+    with st.container(border=True):
+        # Only run this once per session, we don't want CCS to get angry 😡 branching should take care of this
+        if 'open_time' not in st.session_state:
+            st.write(f'Your Session Key: {skey}')
+
+            st.session_state.open_time = process_ot(
+                skey, selected_cats, bid_month)
+            st.rerun()
+        # Once we have the open time, the script will branch into displaying the results
+        else:
+            open_time = st.session_state.open_time
+            st.write(open_time)
+
+            st.selectbox('Category', selected_cats_text)
+            visualizer(selected_bases)
