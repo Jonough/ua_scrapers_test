@@ -16,6 +16,7 @@ import pandas as pd
 # Local Imports
 from ua_scrapers_ref import *
 
+
 def extract_ot_html(ot_url, cat, bid_month):
     """
     Extracts and returns the raw html text of the relevant category and bid month from the CCS -> Trading -> Open Time page
@@ -51,6 +52,7 @@ def extract_ot_html(ot_url, cat, bid_month):
                             headers=requests.utils.default_headers()).text
     return ot_html
 
+
 def extract_ot_list(skey, cat, bid_month):
     """Takes a session key, category, bid month and returns a list of open time
     """
@@ -58,7 +60,7 @@ def extract_ot_list(skey, cat, bid_month):
     # Create the OT URL with the session key
     ot_url = (f'https://ccs.ual.com/CCS/opentime.aspx?'
               f'SKEY={skey}&CMS=False')
-    
+
     # Shamelessly stolen from CCS Reserve Scraper
     max_attempts = 3
     attempts = 1
@@ -115,15 +117,35 @@ def extract_ot_list(skey, cat, bid_month):
 
     return ot
 
-def ot_totals():
-    pass
-    #Dictionary of Base: (total credit hours, no of trips)
+
+def calculate_ot_totals(ot):
+    grouped = ot.groupby('Category')
+
+    ot_total_credit = {}
+    ot_trip_count = {}
+
+    # Go through each category and sum pay times
+    for cat, ot_list in grouped:
+        # First get the Pay Time column as a list of strings
+        pay_times = ot_list['Pay Time'].tolist()
+        # Next use a lambda function and map to convert it to a list of timedelta objects
+        pay_times_td = list(map(lambda p: timedelta(
+            hours=int(p[:2]), minutes=int(p[3:])), pay_times))
+        # Sum the timedelta objects and format the result
+        total = td_hhmm(sum(pay_times_td, datetime.timedelta()))
+        # Store in result
+        ot_total_credit[cat] = total
+        ot_trip_count[cat] = len(ot_list)
+
+    # Two dictionaries, total credit per base and trip count per base
+    return (ot_total_credit, ot_trip_count)
+
 
 def initialize_session(skey):
     session = requests.Session()
 
     ot_url = (f'https://ccs.ual.com/CCS/opentime.aspx?'
               f'SKEY={skey}&CMS=False')
-    
+
     if (session.get(ot_url, verify=False, headers=requests.utils.default_headers()).status_code != 200):
         raise ValueError(msg='Session is not valid!')

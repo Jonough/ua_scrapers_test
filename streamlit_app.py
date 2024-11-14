@@ -16,8 +16,15 @@ from ot_scraper_engine import *
 AIRPORTS = airportsdata.load('IATA')  # vs ICAO
 
 # Make it look pretty (try to anyway..)
+st.set_page_config(page_title='UA Scrapers Test')
 st.logo(image='SSCLogoLowRes.png', size='large')
 st.title('UA Scrapers')
+
+# Cache so it doesn't re-run every time
+@st.cache_data
+def add_credit_hours(open_time):
+    return calculate_ot_totals(open_time)
+
 
 def process_ot(skey, cats, bid_month):
     st.write(bid_month)
@@ -107,6 +114,7 @@ if 'ot_form' not in st.session_state:
                 if not selected_bases:
                     st.write("Please select at least one base!")
                 else:
+                    # All inputs are valid, save them to a tuple and rerun the script
                     st.session_state.ot_form = (match.group(
                         'skey'), selected_bases, bid_month)
                     st.rerun()
@@ -133,8 +141,28 @@ else:
             st.rerun()
         # Once we have the open time, the script will branch into displaying the results
         else:
+            # Left side
+            left, right = st.columns(2)
             open_time = st.session_state.open_time
-            st.write(open_time)
+            left.write(open_time)
 
-            st.selectbox('Category', selected_cats_text)
+            # Right side
+            category_viewer = right.selectbox('Category', selected_cats_text)
+            ot_total_credit, ot_trip_count = add_credit_hours(open_time)
+            selected_credit, no_trips = ot_total_credit[category_viewer], ot_trip_count[category_viewer]
+
+            st.write("Trip Count")
+            df = pd.DataFrame(ot_trip_count.items(), columns=['Category', 'Trip Count'])
+            df.set_index('Category', inplace=True)
+            
+            #ot_trip_count_df = pd.DataFrame(ot_trip_count, columns=['Category', 'Trip Count'])
+            #ot_trip_count_df.set_index('Category')
+            #st.bar_chart(ot_trip_count_df)
+            right.write(f'Total Credit Hours for {category_viewer}: {selected_credit}')
+            right.write(f'Total Number of Trips: {no_trips}')
+            
+            st.bar_chart(df, horizontal=True)
+            st.write(df)
+
+            # Below is the visualizer (map, graph etc.)
             visualizer(selected_bases)
