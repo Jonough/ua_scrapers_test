@@ -119,10 +119,12 @@ def extract_ot_list(skey, cat, bid_month):
 
 
 def calculate_ot_totals(ot):
+    if ot.empty:
+        return {}
+    
     grouped = ot.groupby('Category')
 
-    ot_total_credit = {}
-    ot_trip_count = {}
+    ot_totals = {}
 
     # Go through each category and sum pay times
     for cat, ot_list in grouped:
@@ -134,11 +136,10 @@ def calculate_ot_totals(ot):
         # Sum the timedelta objects and format the result
         total = td_hhmm(sum(pay_times_td, datetime.timedelta()))
         # Store in result
-        ot_total_credit[cat] = total
-        ot_trip_count[cat] = len(ot_list)
+        ot_totals[cat] = [len(ot_list), total]
 
-    # Two dictionaries, total credit per base and trip count per base
-    return (ot_total_credit, ot_trip_count)
+    # Dictionary: category(key): trip count, total credit
+    return ot_totals
 
 
 def initialize_session(skey):

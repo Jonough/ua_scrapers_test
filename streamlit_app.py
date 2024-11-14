@@ -99,7 +99,7 @@ if 'ot_form' not in st.session_state:
         selected_bases = st.multiselect("Select one or more options:",
                                         BASES_W_FLEETS)
 
-        # Bid month dropdown - default to NOV2024
+        # Bid month dropdown - default to NOV2024 - MIGHT WANT TO UPDATE TO DEFAULT TO CURRENT OR NEXT MONTH
         bid_month = st.selectbox("Bid Month", BID_MONTHS, index=1)
 
         # Submit button
@@ -141,28 +141,32 @@ else:
             st.rerun()
         # Once we have the open time, the script will branch into displaying the results
         else:
-            # Left side
-            left, right = st.columns(2)
+            
+
+            # copy of existing open time
             open_time = st.session_state.open_time
-            left.write(open_time)
+            if open_time.empty:
+                st.write("Nothing in Open Time! Here's a pretty map you can play with while you figure out what went wrong:")
+                st.map()
+            else:
+                # This is the main branch for results
+                # Initialize streamlit columns
+                left, right = st.columns(2, gap='large')
+                left.write('Trip List')
+                left.write(open_time)
 
-            # Right side
-            category_viewer = right.selectbox('Category', selected_cats_text)
-            ot_total_credit, ot_trip_count = add_credit_hours(open_time)
-            selected_credit, no_trips = ot_total_credit[category_viewer], ot_trip_count[category_viewer]
+                # Right side
+                ot_totals = add_credit_hours(open_time)
+                df = pd.DataFrame.from_dict(ot_totals, orient='index', columns=['Trip Count', 'Total Credit'])
+                df.index.name = 'Category'
+                right.write('Totals')
+                right.write(df)
+                
+                # Try to plot trip totals:
 
-            st.write("Trip Count")
-            df = pd.DataFrame(ot_trip_count.items(), columns=['Category', 'Trip Count'])
-            df.set_index('Category', inplace=True)
-            
-            #ot_trip_count_df = pd.DataFrame(ot_trip_count, columns=['Category', 'Trip Count'])
-            #ot_trip_count_df.set_index('Category')
-            #st.bar_chart(ot_trip_count_df)
-            right.write(f'Total Credit Hours for {category_viewer}: {selected_credit}')
-            right.write(f'Total Number of Trips: {no_trips}')
-            
-            st.bar_chart(df, horizontal=True)
-            st.write(df)
+                
+                st.write("Trip Count")
+                st.bar_chart(df.drop(labels='Total Credit', axis=1), horizontal=True)
 
-            # Below is the visualizer (map, graph etc.)
-            visualizer(selected_bases)
+                # Below is the visualizer (map, graph etc.)
+                visualizer(selected_bases)
