@@ -53,17 +53,18 @@ def mins_to_dur(mins):
 
 def dur_to_mins(d):
     # Takes a time in hhh:mm format and returns the number of minutes
+    # Returns -1 if there was an error
     total_mins = 0
     try:
         s = str.split(d, sep=':')
         # Error checking for correct number after split (should be 2)
         if len(s) != 2:
             print(f'Error with duration format: {d}')
-            return 0
+            return -1
         # Hours can be 1 or more digits, but mins has to be 2
         if len(s[1]) != 2:
             print(f'Error with duration format: {d}')
-            return 0
+            return -1
 
         # These will throw an exception if they don't convert to int
         h = int(s[0])
@@ -72,10 +73,10 @@ def dur_to_mins(d):
         # Minutes should be 0 to 59
         if (m > 59):
             print(f'Error with minutes format: {m}')
-            return 0
+            return -1
     except:
         print(f'Format error with {d}')
-        return 0
+        return -1
 
     return m + (60*h)
 

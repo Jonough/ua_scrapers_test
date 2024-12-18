@@ -180,8 +180,6 @@ else:
         else:
             # This is the main branch that displays everything
 
-            
-
             # Take the open_time dataframe and save it to a csv with the bid month as file name
             ot_csv = convert_df(open_time)
             st.download_button('Download Entire Trip List', ot_csv,
@@ -227,9 +225,18 @@ else:
                 cat_credit = st.text_input(
                     'Enter Category Total Credit:')  # Total category credit
                 if st.button('Submit'):
-                    co_adj = dur_to_mins(co_adj)
+                    if not co_adj or co_adj == '0':
+                        # Blank or 0 CO adjustment, make it zero
+                        co_adj = 0
+                    else:
+                        # Otherwise try to convert it to minutes
+                        co_adj = dur_to_mins(co_adj)
+
+                    # Convert Category credit to minutes
                     cat_credit = dur_to_mins(cat_credit)
-                    if (co_adj == 0) or (cat_credit == 0):
+
+                    # Check if user input is valid
+                    if (co_adj < 0) or (cat_credit < 0):
                         st.write(
                             'Please enter a valid CO adjustment and total credit in hhh:mm format')
                     else:
@@ -238,10 +245,16 @@ else:
                             ot_totals['Pay Minutes'][selected_cat] - co_adj)
                         st.write(
                             f'Total without carry-over: {mins_to_dur(adj_credit)}')
-                        
+
                         # Calculate the percentage of open time credit and display it (2 decimal places)
                         percentage = ((adj_credit / cat_credit)*100)
-                        st.write(f'Percentage of credit in open time: {percentage:.2f}')
+                        st.write(
+                            f'Percentage of credit in open time: {percentage:.2f}%')
+                        
+                        # Calculate the required number to bring it up to 1%
+                        if percentage < 1.0:
+                            d = (cat_credit/100) - adj_credit
+                            st.write(f'{mins_to_dur(int(d) + 1)} more needed to achieve 1%')
 
             # Try to plot trip totals:
 
