@@ -55,6 +55,7 @@ def dur_to_mins(d):
     # Takes a time in hhh:mm format and returns the number of minutes
     # Returns -1 if there was an error
     total_mins = 0
+    d = d.strip(',') # Remove commas
     try:
         s = str.split(d, sep=':')
         # Error checking for correct number after split (should be 2)
