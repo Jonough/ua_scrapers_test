@@ -256,7 +256,7 @@ else:
                             d = (cat_credit/100) - adj_credit
                             st.write(f'{mins_to_dur(int(d) + 1)} more needed to achieve 1%')
 
-            # Try to plot trip totals:
+            # Just for fun:
 
             st.write("Trip Count")
             st.bar_chart(ot_totals.drop(labels=['Total Credit', 'Pay Minutes'],
