@@ -158,8 +158,8 @@ else:
 
     if 'selected_cats_text' not in st.session_state:
         # Generate list of categories adding an ALL option
-        st.session_state.selected_cats_text = open_time['Category'].unique(
-        ).tolist()
+        st.session_state.selected_cats_text = sorted(open_time['Category'].unique(
+        ).tolist())
         st.session_state.selected_cats_text.insert(0, 'ALL')
 
     if 'bid_month' not in st.session_state:
