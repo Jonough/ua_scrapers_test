@@ -51,9 +51,14 @@ def process_ot(skey, cats, bid_month):
 
         ot = extract_ot_list(skey, cat, bid_month)
         if ot.empty:
-            st.write(
-                f'Error with {cat[0]}{cat[1]}{cat[2]}: Connection error or no trips')
-            time.sleep(5)  # So user can see the error
+            if set(OT_DF_FORMAT).issubset(ot.columns):
+                # Empty dataframe with columns, so no trips found
+                st.write(
+                    f'No trips found for {cat[0]}{cat[1]}{cat[2]}')
+            else:
+                # This means we had a page error as opposed to just no trips
+                st.write(
+                    f'Error with {cat[0]}{cat[1]}{cat[2]}: connection error')
         else:
             df = pd.concat((df, ot), ignore_index=True)
 
@@ -104,15 +109,19 @@ if ('ot_form' not in st.session_state) and ('open_time' not in st.session_state)
                         if ot.empty:  # Empty dataframe
                             st.write('No trips in the file! Please select another file.')
                         else:
+                            # Correct format, save it
                             st.session_state.open_time = ot
-                            st.rerun()
-                    else:  # Couldn't find the right columns in the data
+                    else: 
+                        # Couldn't find the right columns in the data
                         st.write(
                             'The file is in the incorrect format! Please select another file.')
                 except:
                     st.write(
                         'Issue reading the file! Please select another file.')
                 
+                if 'open_time' in st.session_state:
+                    # Successfully opened the file, rerun to branch into the main branch
+                    st.rerun()
             else:
                 # No file, so we check if the form inputs are valid
 
@@ -153,7 +162,14 @@ else:
             st.rerun()
 
     # copy of existing open time
-    open_time = st.session_state.open_time
+    open_time = st.session_state.open_time.copy()
+
+    # If it's empty, don't continue and start from the beginning
+    if open_time.empty:
+        st.write('No Data! Starting over')
+        time.sleep(2)
+        st.session_state.clear()
+        st.rerun()
 
     if 'selected_cats_text' not in st.session_state:
         # Generate list of categories adding an ALL option
@@ -172,97 +188,92 @@ else:
     st.write(bid_month)
 
     with st.container(border=True):
-        if open_time.empty:
-            st.write(
-                "Nothing in Open Time! Here's a pretty map you can play with while you figure out what went wrong:")
-            st.map()
-        else:
-            # This is the main branch that displays everything
+        # This is the main branch that displays everything
 
-            # Take the open_time dataframe and save it to a csv with the bid month as file name
-            ot_csv = convert_df(open_time)
-            st.download_button('Download Entire Trip List', ot_csv,
-                               file_name=f'{bid_month}.csv')
+        # Take the open_time dataframe and save it to a csv with the bid month as file name
+        ot_csv = convert_df(open_time)
+        st.download_button('Download Entire Trip List', ot_csv,
+                            file_name=f'{bid_month}.csv')
 
-            # Category Filter
-            selected_category = st.selectbox('Category', selected_cats_text)
+        # Category Filter
+        selected_category = st.selectbox('Category', selected_cats_text)
 
-            # For displaying filtered results
-            trip_list = open_time.copy()
+        # For displaying filtered results
+        trip_list = open_time.copy()
 
-            if (selected_category != 'ALL'):
-                # Filter selected category
-                trip_list = trip_list[trip_list['Category']
-                                      == selected_category]
+        if (selected_category != 'ALL'):
+            # Filter selected category
+            trip_list = trip_list[trip_list['Category']
+                                    == selected_category]
 
-            if st.checkbox('Show Carryover Trips Only'):
-                # Filter carryover if pairing end date is past the end of the bid month
-                trip_list = trip_list[trip_list['Pairing End Date']
-                                      > BID_MONTHS_DT[bid_month][1]]
+        if st.checkbox('Show Carryover Trips Only'):
+            # Filter carryover if pairing end date is past the end of the bid month
+            trip_list = trip_list[trip_list['Pairing End Date']
+                                    > BID_MONTHS_DT[bid_month][1]]
 
-            st.write('Trip List')
-            # Don't display these columns to the user
-            st.write(trip_list.drop(
-                ['Pairing End Date', 'Pay Minutes'], axis=1))
+        st.write('Trip List')
+        # Don't display these columns to the user
+        st.write(trip_list.drop(
+            ['Pairing End Date', 'Pay Minutes'], axis=1))
 
-            # Initialize streamlit columns
-            left, right = st.columns(2, gap='small')
+        # Initialize streamlit columns
+        left, right = st.columns(2, gap='small')
 
-            # Left Side
-            ot_totals = add_credit_hours(open_time)
-            # df = pd.DataFrame.from_dict(ot_totals, orient='index', columns=[
-            #                            'Trip Count', 'Total Credit'])
-            # df.index.name = 'Category'
-            left.write('Totals')
-            left.write(ot_totals.drop('Pay Minutes', axis=1))
+        # Left Side
+        ot_totals = add_credit_hours(open_time)
+        # df = pd.DataFrame.from_dict(ot_totals, orient='index', columns=[
+        #                            'Trip Count', 'Total Credit'])
+        # df.index.name = 'Category'
+        left.write('Totals')
+        left.write(ot_totals.drop('Pay Minutes', axis=1))
 
-            with right.container(border=True):
-                selected_cat = st.selectbox(
-                    'Select Category', selected_cats_text[1:])  # without ALL
-                # Carryover adjustment
-                co_adj = st.text_input('Enter Carryover Adjustment Here:')
-                cat_credit = st.text_input(
-                    'Enter Category Total Credit:')  # Total category credit
-                if st.button('Submit'):
-                    if not co_adj or co_adj == '0':
-                        # Blank or 0 CO adjustment, make it zero
-                        co_adj = 0
-                    else:
-                        # Otherwise try to convert it to minutes
-                        co_adj = dur_to_mins(co_adj)
+        with right.container(border=True):
+            selected_cat = st.selectbox(
+                'Select Category', selected_cats_text[1:])  # without ALL
+            # Carryover adjustment
+            co_adj = st.text_input('Enter Carryover Adjustment Here:')
+            cat_credit = st.text_input(
+                'Enter Category Total Credit:')  # Total category credit
+            if st.button('Submit'):
+                if not co_adj or co_adj == '0':
+                    # Blank or 0 CO adjustment, make it zero
+                    co_adj = 0
+                else:
+                    # Otherwise try to convert it to minutes
+                    co_adj = dur_to_mins(co_adj)
 
-                    # Convert Category credit to minutes
-                    cat_credit = dur_to_mins(cat_credit)
+                # Convert Category credit to minutes
+                cat_credit = dur_to_mins(cat_credit)
 
-                    # Check if user input is valid
-                    if (co_adj < 0) or (cat_credit < 0):
-                        st.write(
-                            'Please enter a valid CO adjustment and total credit in hhh:mm format')
-                    else:
-                        # Deduct the carryover adjustment and display it
-                        adj_credit = int(
-                            ot_totals['Pay Minutes'][selected_cat] - co_adj)
-                        st.write(
-                            f'Total without carry-over: {mins_to_dur(adj_credit)}')
+                # Check if user input is valid
+                if (co_adj < 0) or (cat_credit < 0):
+                    st.write(
+                        'Please enter a valid CO adjustment and total credit in hhh:mm format')
+                else:
+                    # Deduct the carryover adjustment and display it
+                    adj_credit = int(
+                        ot_totals['Pay Minutes'][selected_cat] - co_adj)
+                    st.write(
+                        f'Total without carry-over: {mins_to_dur(adj_credit)}')
 
-                        # Calculate the percentage of open time credit and display it (2 decimal places)
-                        percentage = ((adj_credit / cat_credit)*100)
-                        st.write(
-                            f'Percentage of credit in open time: {percentage:.2f}%')
-                        
-                        # Calculate the required number to bring it up to 1%
-                        if percentage < 1.0:
-                            d = (cat_credit/100) - adj_credit
-                            st.write(f'{mins_to_dur(int(d) + 1)} more needed to achieve 1%')
+                    # Calculate the percentage of open time credit and display it (2 decimal places)
+                    percentage = ((adj_credit / cat_credit)*100)
+                    st.write(
+                        f'Percentage of credit in open time: {percentage:.2f}%')
+                    
+                    # Calculate the required number to bring it up to 1%
+                    if percentage < 1.0:
+                        d = (cat_credit/100) - adj_credit
+                        st.write(f'{mins_to_dur(int(d) + 1)} more needed to achieve 1%')
 
-            # Just for fun:
+        # Just for fun:
 
-            st.write("Trip Count")
-            st.bar_chart(ot_totals.drop(labels=['Total Credit', 'Pay Minutes'],
-                                        axis=1), horizontal=True)
+        st.write("Trip Count")
+        st.bar_chart(ot_totals.drop(labels=['Total Credit', 'Pay Minutes'],
+                                    axis=1), horizontal=True)
 
-            st.write("Total Pay Minutes")
-            st.bar_chart(ot_totals.drop(labels=['Trip Count', 'Total Credit'],
-                                        axis=1), horizontal=True)
+        st.write("Total Pay Minutes")
+        st.bar_chart(ot_totals.drop(labels=['Trip Count', 'Total Credit'],
+                                    axis=1), horizontal=True)
 
-            st.map()
+        st.map()

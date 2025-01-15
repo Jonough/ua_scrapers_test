@@ -106,6 +106,8 @@ def str_to_dur(s):
 def extract_ot_html(ot_url, cat, bid_month):
     """
     Extracts and returns the raw html text of the relevant category and bid month from the CCS -> Trading -> Open Time page
+    Returns a dataframe with columns OT_DF_FORMAT. If no trips, returns an empty dataframe with OT_DF_FORMAT columns.
+    If it runs into a page problem, returns an empty dataframe with no columns
     """
     ot_url_payload = {
         '__VIEWSTATE': '/wEPDwUJNTU4NzU2MjAzDxYCHhNWYWxpZGF0ZVJlcXVlc3RNb2RlAgEWAmYPZBYEAgEPZBYEAgoPFgIeBGhyZWYFIH4vQ29udGVudC9hcHAvaWNvbnMvSWNvbi01MTIucG5nZAIcDxYCHgRUZXh0Be0CPHNjcmlwdCBzcmM9Ii9DQ1MvanMvanF1ZXJ5LTMuNS4xLm1pbi5qcyIgdHlwZT0idGV4dC9qYXZhc2NyaXB0Ij48L3NjcmlwdD48c2NyaXB0IHNyYz0iL0NDUy9TY3JpcHRzL2pxdWVyeS11aS5taW4uanMiIHR5cGU9InRleHQvamF2YXNjcmlwdCI+PC9zY3JpcHQ+PHNjcmlwdCBzcmM9Ii9DQ1MvU2NyaXB0cy9qcXVlcnkudmFsaWRhdGUubWluLmpzIiB0eXBlPSJ0ZXh0L2phdmFzY3JpcHQiPjwvc2NyaXB0PjxzY3JpcHQgc3JjPSIvQ0NTL2pzL3BsdWdpbnMvcHVybC5qcyIgdHlwZT0idGV4dC9qYXZhc2NyaXB0Ij48L3NjcmlwdD48c2NyaXB0IHNyYz0iL0NDUy9qcy9VdGlscy5qcyIgdHlwZT0idGV4dC9qYXZhc2NyaXB0Ij48L3NjcmlwdD5kAgMPZBYKAgMPZBYGAgEPFgIfAQU6fi9NYWluLmFzcHg/U0tFWT0wMzIwYjFlY2E4NDYxMmM0OTEyOTE1ZGFlOWQxYTQ2NmM2YjIzNjQ0NGQCBQ8WAh4JaW5uZXJodG1sZWQCCQ8WAh8DBQ1UcmlwIFNob3BwaW5nZAIFD2QWBgIDDxYCHwEFOn4vTWFpbi5hc3B4P1NLRVk9MDMyMGIxZWNhODQ2MTJjNDkxMjkxNWRhZTlkMWE0NjZjNmIyMzY0NDRkAgUPFgIfAwUWSk9OQVRIQU4gSCBPVUdIT1VSTElBTmQCBw8WAh8DBQ1UcmlwIFNob3BwaW5nZAIJD2QWAmYPZBYCAgEPDxYCHwJlZGQCCw9kFgQCAQ8WAh8BBUkvQ0NTL0xvZ29mZjIuYXNweD9TS0VZPTAzMjBiMWVjYTg0NjEyYzQ5MTI5MTVkYWU5ZDFhNDY2YzZiMjM2NDQ0JkxvZ29mZj0xZAIDDxYCHwEFQS9DQ1MvTWVudXBhZ2UuYXNweD9TS0VZPTAzMjBiMWVjYTg0NjEyYzQ5MTI5MTVkYWU5ZDFhNDY2YzZiMjM2NDQ0ZAIPDxYCHwMFP0NvcHlyaWdodCAmY29weTsgMjAyNCBVbml0ZWQgQWlybGluZXMsIEluYy4gQWxsIFJpZ2h0cyBSZXNlcnZlZGRkZWBxXNmS3fcArMABc7WGYuFl9MM=',
@@ -158,10 +160,15 @@ def extract_ot_list(skey, cat, bid_month):
         if bad_html:
             attempts += 1
             if attempts >= max_attempts:
-                return pd.DataFrame() # Return empty dataframe
+                return pd.DataFrame() # Return empty dataframe if we had an error
         else:
             # Used to be a warning here
             break
+
+    # Check if no trips
+    if 'No Records' in raw_html:
+        # If no trips, return a dataframe in the correct format to distinguish from a page error
+        return pd.DataFrame(columns=OT_DF_FORMAT)
 
     ot_display_html = io.StringIO(initial_value=raw_html)
     all_tables = pd.read_html(ot_display_html)
