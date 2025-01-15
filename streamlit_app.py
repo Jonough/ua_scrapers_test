@@ -90,6 +90,7 @@ if ('ot_form' not in st.session_state) and ('open_time' not in st.session_state)
         if st.form_submit_button():
             # First check if the user uploaded a file
             if ot_file is not None:
+                # If so, import the file checking for valid data
                 try:
                     ot = pd.read_csv(ot_file, dtype=OT_DF_DTYPES)
                     # String to dates:
@@ -97,42 +98,40 @@ if ('ot_form' not in st.session_state) and ('open_time' not in st.session_state)
                         d, '%Y-%m-%d').date())
                     ot['Pairing End Date'] = ot['Pairing End Date'].apply(lambda d: datetime.strptime(
                         d, '%Y-%m-%d').date())
+                    
+                    # Check for correct format
+                    if set(OT_DF_FORMAT).issubset(ot.columns):
+                        if ot.empty:  # Empty dataframe
+                            st.write('No trips in the file! Please select another file.')
+                        else:
+                            st.session_state.open_time = ot
+                            st.rerun()
+                    else:  # Couldn't find the right columns in the data
+                        st.write(
+                            'The file is in the incorrect format! Please select another file.')
                 except:
                     st.write(
                         'Issue reading the file! Please select another file.')
-                    time.sleep(3)
-                    st.rerun()
-                if ot.empty:  # Empty dataframe
-                    st.write('No trips in the file! Please select another file.')
-                    time.sleep(3)
-                    st.rerun()
-                if set(OT_DF_FORMAT).issubset(ot.columns):
-                    st.session_state.open_time = ot
-                    st.rerun()
-                else:  # Couldn't find the right columns in the data
-                    st.write(
-                        'The file is in the incorrect format! Please select another file.')
-                    time.sleep(3)
-                    st.rerun()
-
-            # No file, so we check if the form inputs are valid
-
-            # If all selected, fill in selected bases
-            if (all):
-                selected_bases = list(BASES_W_FLEETS.keys())
-
-            # Check valid skey can be extracted from URL
-            if match := re.match(SKEY_RE, ccs_url):
-                # If no bases, prompt user to enter at least one
-                if not selected_bases:
-                    st.write('Please select at least one base!')
-                else:
-                    # All inputs are valid, save them to a cached tuple and rerun the script
-                    st.session_state.ot_form = (match.group(
-                        'skey'), selected_bases, bid_month)
-                    st.rerun()
+                
             else:
-                st.write('Not a valid CCS URL!')
+                # No file, so we check if the form inputs are valid
+
+                # If all selected, fill in selected bases
+                if (all):
+                    selected_bases = list(BASES_W_FLEETS.keys())
+
+                # Check valid skey can be extracted from URL
+                if match := re.match(SKEY_RE, ccs_url):
+                    # If no bases, prompt user to enter at least one
+                    if not selected_bases:
+                        st.write('Please select at least one base!')
+                    else:
+                        # All inputs are valid, save them to a cached tuple and rerun the script
+                        st.session_state.ot_form = (match.group(
+                            'skey'), selected_bases, bid_month)
+                        st.rerun()
+                else:
+                    st.write('Not a valid CCS URL!')
 # We have form data submitted and validated, do the rest
 else:
     # Form data was submitted and no file was uploaded, so scrape the open time list

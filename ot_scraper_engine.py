@@ -18,18 +18,20 @@ from ua_scrapers_ref import *
 
 # CONSTANTS
 
-OT_DF_FORMAT = ['Pairing Number', 'Category',
-                'Pairing Date', 'Pairing End Date', 'Days', 'Pay Time', 'Pay Minutes']
+
 
 OT_DF_DTYPES = {
-    'Pairing Number': str,
-    'Category': str,
-    'Pairing Date': str,
-    'Pairing End Date': str,
-    'Days': int,
-    'Pay Time': str,
-    'Pay Minutes': int
+    'Pairing Number'    : str,
+    'Category'          : str,
+    'Pairing Date'      : str,
+    'Pairing End Date'  : str,
+    'Days'              : int,
+    'Pay Time'          : str,
+    'Pay Minutes'       : int
 }
+
+# Just the columns, used to validate import csv format
+OT_DF_FORMAT = list(OT_DF_DTYPES.keys())
 
 # HELPER FUNCTIONS
 
